@@ -5,6 +5,38 @@ from peft import LoraConfig, prepare_model_for_kbit_training
 
 from types import MethodType
 
+import logging
+
+class CheckpointLoadingWarningFilter(logging.Filter):
+    '''
+    This filter removes a known warning where checkpoint biases are not expected by the model
+    This is assumed not to affect the performance.
+    '''
+    def filter(self, record):
+        message_str = record.getMessage()
+        return not message_str.startswith('Some weights of the model checkpoint at ')
+
+class QuantLinearExllamaWarningFilter(logging.Filter):
+    '''
+    This filter removes a known warning where an exllama backend is installed
+    the backend will subsequently be replaced regardless with a TritonV2 backend
+    '''
+    def filter(self, record):
+        message_str = record.getMessage()
+        prefix = 'QuantLinear with the exllama backend not does support the trainable mode yet, switching to cuda/cuda_old/triton backend'
+        return not (prefix in message_str)
+
+logger = logging.getLogger('auto_gptq.utils.accelerate_utils')
+logger.addFilter(CheckpointLoadingWarningFilter())
+logger = logging.getLogger('auto_gptq.modeling._base')
+logger.addFilter(QuantLinearExllamaWarningFilter())
+
+from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+from auto_gptq.utils.peft_utils import get_gptq_peft_model
+from auto_gptq.utils.peft_utils import GPTQLoraModel
+from auto_gptq.nn_modules.qlinear.qlinear_tritonv2 import QuantLinear as triton_Qlinear
+
+from peft.tuners.lora.gptq import QuantLinear as LoraLinearGPTQ
 from peft.tuners.lora.model import LoraModel
 
 from typing import Tuple, Dict
@@ -69,7 +101,7 @@ class AutoGPTQAccelerationPlugin(AccelerationPlugin):
             warmup_triton=False, # disable for now, because it will try to run the warmup while on CPU
             use_tritonv2=True,
             trainable=True, # only support trainable mode
-        )
+        )           
 
         # these will be properly set since it is not loaded using from_pretrained
         # - so, set them here. 
@@ -153,6 +185,8 @@ class AutoGPTQAccelerationPlugin(AccelerationPlugin):
         LoraModel._create_new_module = staticmethod(_old_create_new_module)
         GPTQLoraModel._replace_module = MethodType(_old_replace_module, GPTQLoraModel)
 
+        from tuning.acceleration.plugin_utils import unsloth_utils
+        model = unsloth_utils.add_unsloth_improvements(model)
         return model, modifiable_args
 
 # register
