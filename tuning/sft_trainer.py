@@ -305,6 +305,33 @@ def train(
         trainer.accelerator.state.fsdp_plugin.auto_wrap_policy = fsdp_auto_wrap_policy(
             model
         )
+
+
+    from peft.tuners.lora.layer import LoraLayer as lora_layer_cls
+    unsloth_fused_mods = ['q_proj', 'k_proj', 'v_proj', 'o_proj', 'mlp']
+
+    # Ignore Sharding of QKVO LoRA layers if FSDP and Unsloth is enabled
+    modules_to_ignore = [
+        mod for name, mod in trainer.model.named_modules() 
+        if (isinstance(mod, lora_layer_cls) and any([True for unsloth_mod in unsloth_fused_mods if unsloth_mod in name]))
+    ]
+    trainer.accelerator.state.fsdp_plugin.ignored_modules = modules_to_ignore
+
+    # Since now the adapters will all be loaded independently in each device, 
+    # we have to mimic to an all_reduce on their independent gradients so that they update uniformly   
+    import torch.distributed as dist
+    def all_reduce_hook(module, grad_input, grad_output):        
+        print(f'before reduce: {module.weight.grad.norm()}')
+        dist.all_reduce(module.weight.grad, op=dist.ReduceOp.AVG, group=None)
+        dist.all_reduce(module.bias.grad, op=dist.ReduceOp.AVG, group=None)
+        print(f'after reduce: {module.weight.grad.norm()}')
+ 
+    for name, mod in trainer.model.named_modules(): 
+        if (isinstance(mod, lora_layer_cls) and any([True for unsloth_mod in unsloth_fused_mods if unsloth_mod in name])):
+            # install hooks on the adapters
+            mod.lora_A.default.register_full_backward_hook(all_reduce_hook)
+            mod.lora_B.default.register_full_backward_hook(all_reduce_hook)
+
     trainer.train()
 
 
