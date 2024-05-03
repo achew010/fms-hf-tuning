@@ -44,6 +44,36 @@ from tuning.utils.config_utils import get_hf_peft_config
 from tuning.utils.data_type_utils import get_torch_dtype
 from tuning.utils.import_utils import is_aim_available, is_fms_accelerate_available
 
+import torch
+import pdb;
+class _DistributedPdb(pdb.Pdb):
+    def interaction(self, *args, **kwargs):
+        _stdin = sys.stdin
+        try:
+            sys.stdin = open('/dev/stdin')
+            pdb.Pdb.interaction(self, *args, **kwargs)
+        finally:
+            sys.stdin = _stdin
+
+def _breakpoint(rank: int = 0):
+    """
+    Set a breakpoint, but only on a single rank.  All other ranks will wait for you to be
+    done with the breakpoint before continuing.
+
+    Args:
+        rank (int): Which rank to break on.  Default: ``0``
+    """
+    if torch.distributed.get_rank() == rank:
+        pdb = _DistributedPdb()
+        pdb.message(
+            "\n!!! ATTENTION !!!\n\n"
+            f"Type 'up' to get to the frame that called dist.breakpoint(rank={rank})\n"
+        )
+        pdb.set_trace()
+    torch.distributed.barrier()
+
+torch.distributed.breakpoint = _breakpoint
+
 if is_aim_available():
     # Local
     from tuning.aim_loader import get_aimstack_callback
@@ -301,38 +331,82 @@ def train(
         peft_config=peft_config,
     )
 
+    from functools import partial
+    import inspect
+    def _forward(*args, model_forward=None, timings=None, **kwargs):
+        # add cuda timer here
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+        start.record()
+        outs = model_forward(*args, **kwargs)
+        end.record()
+        torch.cuda.synchronize()
+        timings.append(start.elapsed_time(end))
+        return outs
+
+    from peft.tuners.lora.layer import LoraLayer
+    from peft.peft_model import PeftModelForCausalLM
+    from transformers.models.llama.modeling_llama import LlamaForCausalLM, LlamaDecoderLayer, LlamaAttention
+    trainer.attention_timings = []
+    trainer.decoder_timings = []
+    trainer.lorabaselayer_timings = []
+    trainer.loralayer_timings = []
+    trainer.model_timings = []
+    trainer.peftmodel_timings = []
+    trainer.fsdpmodel_timings = [] # in trainer.compute_loss
+    trainer.train_step_timings = []
+    
+    for name, mod in trainer.model.named_modules():
+        if isinstance(mod, PeftModelForCausalLM):
+            mod.forward = partial(_forward, model_forward=mod.forward, timings=trainer.peftmodel_timings)
+       
+        if isinstance(mod, LlamaForCausalLM):
+            sig = inspect.signature(mod.forward)
+            mod.forward = partial(_forward, model_forward=mod.forward, timings=trainer.model_timings)
+            mod.forward.__signature__ = sig
+
+        if isinstance(mod, LlamaDecoderLayer):
+            # sig = inspect.signature(mod.forward)
+            mod.forward = partial(_forward, model_forward=mod.forward, timings=trainer.decoder_timings)
+            # mod.forward.__signature__ = sig
+
+        if isinstance(mod, LlamaAttention):
+            mod.forward = partial(_forward, model_forward=mod.forward, timings=trainer.attention_timings)
+
+        if isinstance(mod, LoraLayer):
+            mod.forward = partial(_forward, model_forward=mod.forward, timings=trainer.loralayer_timings)
+            mod.base_layer.forward = partial(_forward, model_forward=mod.base_layer.forward, timings=trainer.lorabaselayer_timings)
+
+    trainer.compute_loss = partial(_forward, model_forward=trainer.compute_loss, timings=trainer.fsdpmodel_timings)
+    trainer.training_step = partial(_forward, model_forward=trainer.training_step, timings=trainer.train_step_timings)
+
     if trainer.is_fsdp_enabled and peft_config is not None:
         trainer.accelerator.state.fsdp_plugin.auto_wrap_policy = fsdp_auto_wrap_policy(
             model
         )
 
-
-    from peft.tuners.lora.layer import LoraLayer as lora_layer_cls
-    unsloth_fused_mods = ['q_proj', 'k_proj', 'v_proj', 'o_proj', 'mlp']
-
-    # Ignore Sharding of QKVO LoRA layers if FSDP and Unsloth is enabled
-    modules_to_ignore = [
-        mod for name, mod in trainer.model.named_modules() 
-        if (isinstance(mod, lora_layer_cls) and any([True for unsloth_mod in unsloth_fused_mods if unsloth_mod in name]))
-    ]
-    trainer.accelerator.state.fsdp_plugin.ignored_modules = modules_to_ignore
-
-    # Since now the adapters will all be loaded independently in each device, 
-    # we have to mimic to an all_reduce on their independent gradients so that they update uniformly   
-    import torch.distributed as dist
-    def all_reduce_hook(module, grad_input, grad_output):        
-        print(f'before reduce: {module.weight.grad.norm()}')
-        dist.all_reduce(module.weight.grad, op=dist.ReduceOp.AVG, group=None)
-        dist.all_reduce(module.bias.grad, op=dist.ReduceOp.AVG, group=None)
-        print(f'after reduce: {module.weight.grad.norm()}')
- 
-    for name, mod in trainer.model.named_modules(): 
-        if (isinstance(mod, lora_layer_cls) and any([True for unsloth_mod in unsloth_fused_mods if unsloth_mod in name])):
-            # install hooks on the adapters
-            mod.lora_A.default.register_full_backward_hook(all_reduce_hook)
-            mod.lora_B.default.register_full_backward_hook(all_reduce_hook)
-
     trainer.train()
+
+    import numpy as np
+    lorabaselayer_avg_forward = np.mean(trainer.lorabaselayer_timings)
+    loralayer_avg_forward = np.mean(trainer.loralayer_timings)
+    attention_avg_forward = np.mean(trainer.attention_timings)
+    decoder_avg_forward = np.mean(trainer.decoder_timings)
+    model_avg_forward = np.mean(trainer.model_timings)
+    peftmodel_avg_forward = np.mean(trainer.peftmodel_timings)
+    fsdp_avg_forward = np.mean(trainer.fsdpmodel_timings)
+    avg_train_step = np.mean(trainer.train_step_timings)
+
+    print(f'''
+    Avg Train Step: {avg_train_step}, 
+    Avg Fsdp forward: {fsdp_avg_forward}, 
+    Avg PeftModel forward: {peftmodel_avg_forward},
+    Avg Model forward: {model_avg_forward},
+    Avg Decoder forward: {decoder_avg_forward},
+    Avg Attention forward: {attention_avg_forward},
+    Avg LoraLayer forward: {loralayer_avg_forward},
+    Avg BaseLayer forward: {lorabaselayer_avg_forward},
+    ''')
 
 
 def main(**kwargs):  # pylint: disable=unused-argument
