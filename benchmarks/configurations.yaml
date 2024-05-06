@@ -1,0 +1,181 @@
+common:
+    include_tokens_per_second:
+    fp16:
+    training_data_path: '/data/flim/datasets/agnostic/alpaca/data.json'
+    num_train_epochs: 1
+    torch_dtype: float16
+    per_device_train_batch_size: 4
+    per_device_eval_batch_size: 1
+    gradient_accumulation_steps: 1
+    gradient_checkpointing: True
+    evaluation_strategy: "\"no\""
+    save_strategy: "\"no\""
+    learning_rate: 2e-4
+    weight_decay: 0.01
+    warmup_steps: 10
+    adam_epsilon: 1e-4
+    use_flash_attn: 'True'
+    lr_scheduler_type: "\"linear\""
+    logging_strategy: steps
+    logging_steps: 10
+    response_template: "\"\n### Response:\""
+    dataset_text_field: "\"output\""
+    max_steps: 100
+    peft_method: 'lora'
+    r: 16
+    lora_alpha: 16
+    lora_dropout: "0.0"
+    target_modules: q_proj k_proj v_proj o_proj
+
+variants:
+    ## mistral7b
+    mistral7b_padded_1:
+        num_processes: 1
+        packing: 'False'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Mistral-7B-v0.1-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/acceleration_framework.yaml"
+        output_dir: "./results/mistral7b/mistral7b_padded_1"
+
+    mistral7b_packed_1:
+        num_processes: 1
+        packing: 'True'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Mistral-7B-v0.1-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/acceleration_framework.yaml"
+        output_dir: "./results/mistral7b/mistral7b_packed_1"
+
+    unsloth_mistral7b_padded_1:
+        num_processes: 1
+        packing: 'False'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Mistral-7B-v0.1-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/unsloth_acceleration_framework.yaml"
+        output_dir: "./results/mistral7b/unsloth_mistral7b_padded_1"
+
+    unsloth_mistral7b_packed_1:
+        num_processes: 1
+        packing: 'True'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Mistral-7B-v0.1-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/unsloth_acceleration_framework.yaml"
+        output_dir: "./results/mistral7b/unsloth_mistral7b_packed_1"
+
+    ### mixtral
+    mixtral_padded_1:
+        num_processes: 1
+        packing: 'False'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/acceleration_framework.yaml"
+        output_dir: ./results/mixtral/mixtral_padded_1
+
+    mixtral_packed_1:
+        num_processes: 1
+        packing: 'True'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/acceleration_framework.yaml"
+        output_dir: ./results/mixtral/mixtral_packed_1
+
+    unsloth_mixtral_padded_1:
+        num_processes: 1
+        packing: 'False'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/unsloth_acceleration_framework.yaml"
+        output_dir: ./results/mixtral/unsloth_mixtral_padded_1
+
+    unsloth_mixtral_packed_1:
+        num_processes: 1
+        packing: 'True'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/unsloth_acceleration_framework.yaml"
+        output_dir: ./results/mixtral/unsloth_mixtral_packed_1
+
+    ### llama2-70b
+    llama2-70b_padded_1:
+        num_processes: 1
+        packing: 'False'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Llama-2-70B-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/acceleration_framework.yaml"
+        output_dir: ./results/llama2-70b/llama2-70b_padded_1
+
+    llama2-70b_packed_1:
+        num_processes: 1
+        packing: 'True'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Llama-2-70B-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/acceleration_framework.yaml"
+        output_dir: ./results/llama2-70b/llama2-70b_packed_1
+
+    unsloth_llama2-70b_padded_1:
+        num_processes: 1
+        packing: 'False'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Llama-2-70B-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/unsloth_acceleration_framework.yaml"
+        output_dir: ./results/llama2-70b/unsloth_llama2-70b_padded_1
+
+    unsloth_llama2-70b_packed_1:
+        num_processes: 1
+        packing: 'True'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Llama-2-70B-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/unsloth_acceleration_framework.yaml"
+        output_dir: ./results/llama2-70b/unsloth_llama2-70b_packed_1
+
+    llama2-70b_padded_2:
+        num_processes: 2
+        per_device_train_batch_size: 2
+        packing: 'False'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Llama-2-70B-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/acceleration_framework.yaml"
+        output_dir: ./results/llama2-70b/llama2-70b_padded_2
+
+    llama2-70b_packed_2:
+        num_processes: 2
+        per_device_train_batch_size: 2
+        packing: 'True'
+        max_seq_len: 4096
+        model_name_or_path: TheBloke/Llama-2-70B-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/acceleration_framework.yaml"
+        output_dir: ./results/llama2-70b/llama2-70b_packed_1
+        
+    ### llama3-70b
+    llama3-70b_padded_2:
+        num_processes: 2
+        per_device_train_batch_size: 2
+        packing: 'False'
+        max_seq_len: 4096
+        model_name_or_path: /data/aaron/llama3/llama3-70b-hfoptimum-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/acceleration_framework.yaml"
+        output_dir: ./results/llama3-70b/llama3-70b_padded_2
+
+    llama3-70b_packed_2:
+        num_processes: 2
+        per_device_train_batch_size: 2
+        packing: 'True'
+        max_seq_len: 4096
+        model_name_or_path: /data/aaron/llama3/llama3-70b-hfoptimum-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/acceleration_framework.yaml"
+        output_dir: ./results/llama3-70b/llama3-70b_packed_2
+
+    unsloth_llama3-70b_padded_1:
+        num_processes: 1
+        packing: 'False'
+        max_seq_len: 4096
+        model_name_or_path: /data/aaron/llama3/llama3-70b-hfoptimum-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/unsloth_acceleration_framework.yaml"
+        output_dir: ./results/llama3-70b/unsloth_llama3-70b_padded_1
+
+    unsloth_llama3-70b_packed_1:
+        num_processes: 1
+        packing: 'True'
+        max_seq_len: 4096
+        model_name_or_path: /data/aaron/llama3/llama3-70b-hfoptimum-GPTQ
+        acceleration_framework_config_file: "/data/aaron/experimental/fms-hf-tuning/fixtures/unsloth_acceleration_framework.yaml"
+        output_dir: ./results/llama3-70b/unsloth_llama3-70b_packed_1
