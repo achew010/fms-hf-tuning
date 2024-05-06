@@ -311,10 +311,11 @@ def train(
         if is_accelerate_available:
             accelerator = trainer.accelerator
 
-        for x in framework.callbacks(accelerator):
-            trainer.add_callback(x)
+    stats = trainer.train()
 
-    trainer.train()
+    if stats.metrics:
+        with open(f'{train_args.output_dir}/stats.json', "w") as f:
+            json.dump(stats.metrics, f)
 
 
 def main(**kwargs):  # pylint: disable=unused-argument
