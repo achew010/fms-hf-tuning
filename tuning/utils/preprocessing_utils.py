@@ -219,7 +219,26 @@ def format_dataset(
         return train_dataset, eval_dataset, None
 
     dataset_text_field = data_args.dataset_text_field
-    if data_args.data_formatter_template or dataset_text_field:
+    if data_args.pretokenized_data:
+        # assumes dataset in data_args.training_data_path is
+        # - pre-formatted with some template
+        # - pre-tokenized
+        # - response template labels have been masked
+        # - appended with eos token
+        train_dataset = datasets.load_dataset(
+            "json", 
+            data_files=data_args.training_data_path, 
+            split="train"
+        )
+        logger.info("Pretokenized Training dataset length is %s", len(train_dataset))
+        if data_args.validation_data_path:
+            eval_dataset = datasets.load_dataset(
+                "json", 
+                data_files=data_args.validation_data_path, 
+                split="val"
+            )
+            logger.info("Pretokenized validation dataset length is %s", len(eval_dataset))
+    elif data_args.data_formatter_template or dataset_text_field:
         if dataset_text_field is None:
             dataset_text_field = "new_formatted_field"
         train_dataset = get_formatted_dataset_with_single_sequence(

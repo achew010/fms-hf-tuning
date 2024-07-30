@@ -32,6 +32,7 @@ from transformers import (
     LlamaTokenizer,
     LlamaTokenizerFast,
     TrainerCallback,
+    DataCollatorForSeq2Seq
 )
 from transformers.utils import is_accelerate_available, logging
 from trl import SFTConfig, SFTTrainer
@@ -311,6 +312,7 @@ def train(
         max_seq_length=max_seq_length,
         callbacks=trainer_callbacks,
         peft_config=peft_config,
+        dataset_kwargs=dataset_kwargs,
     )
 
     # We track additional metrics and experiment metadata after trainer object creation
