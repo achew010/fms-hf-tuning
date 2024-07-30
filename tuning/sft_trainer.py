@@ -32,6 +32,7 @@ from transformers import (
     LlamaTokenizer,
     LlamaTokenizerFast,
     TrainerCallback,
+    DataCollatorForSeq2Seq
 )
 from transformers.utils import is_accelerate_available, logging
 from trl import SFTConfig, SFTTrainer
@@ -269,7 +270,21 @@ def train(
         formatted_validation_dataset,
         dataset_text_field,
     ) = format_dataset(data_args, tokenizer)
-    data_collator = get_data_collator(packing, data_args.response_template, tokenizer)
+
+    # allow for loading pretokenized data
+    dataset_kwargs = {}
+    if data_args.pretokenized_data:
+        # flag in SFTTrainer to skip the internal formatting and tokenization
+        dataset_kwargs['skip_prepare_dataset'] = True
+        # Build a collator for padding, no tokenization is done inside the collator
+        data_collator = DataCollatorForSeq2Seq(
+            tokenizer=tokenizer,
+            padding="max_length",
+            max_length=max_seq_length,
+            return_tensors="pt"
+        )
+    else:
+        data_collator = get_data_collator(packing, data_args.response_template, tokenizer)
 
     if framework is not None and framework.requires_agumentation:
         model, (peft_config,) = framework.augmentation(
@@ -305,6 +320,7 @@ def train(
         max_seq_length=max_seq_length,
         callbacks=trainer_callbacks,
         peft_config=peft_config,
+        dataset_kwargs=dataset_kwargs,
     )
 
     # We track additional metrics and experiment metadata after trainer object creation
