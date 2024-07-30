@@ -45,6 +45,7 @@ from tuning.config.acceleration_configs import (
     AccelerationFrameworkConfig,
     FusedOpsAndKernelsConfig,
     QuantizedLoraConfig,
+    FastAttentionConfig,
 )
 from tuning.config.tracker_configs import (
     AimConfig,
@@ -84,6 +85,7 @@ def train(
     exp_metadata: Optional[Dict] = None,
     quantized_lora_config: Optional[QuantizedLoraConfig] = None,
     fusedops_kernels_config: Optional[FusedOpsAndKernelsConfig] = None,
+    fast_attention_config: Optional[FastAttentionConfig] = None,
 ):
     """Call the SFTTrainer
 
@@ -111,6 +113,7 @@ def train(
         fusedops_kernels_config: tuning.config.acceleration_configs.FusedOpsAndKernelsConfig \
             Should be used in combination with quantized_lora_config. Also currently 
             fused_lora and fast_kernels must used together (may change in future). \
+        fast_attention_config: Used for padding free and multipack.
     """
 
     logger = logging.get_logger("sft_trainer")
@@ -176,7 +179,8 @@ def train(
             trainer_callbacks.append(cb)
 
     framework = AccelerationFrameworkConfig.from_dataclasses(
-        quantized_lora_config, fusedops_kernels_config
+        quantized_lora_config, fusedops_kernels_config,
+        fast_attention_config
     ).get_framework()
 
     model_loader = AutoModelForCausalLM.from_pretrained
