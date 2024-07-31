@@ -102,9 +102,9 @@ class AccelerationFrameworkConfig:
     padding_free: Annotated[
         PaddingFree,
         ConfigAnnotation(
-            path="training.fast_attention",
+            path="training.attention",
             experimental=True,
-            required_packages=["attn"],
+            required_packages=["ilab"],
         ),
     ] = None
 

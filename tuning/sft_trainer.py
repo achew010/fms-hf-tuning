@@ -317,7 +317,6 @@ def train(
         max_seq_length=max_seq_length,
         callbacks=trainer_callbacks,
         peft_config=peft_config,
-        dataset_kwargs=dataset_kwargs,
     )
 
     # We track additional metrics and experiment metadata after trainer object creation
@@ -347,8 +346,22 @@ def train(
         for x in framework.get_callbacks_and_ready_for_train(model, accelerator):
             trainer.add_callback(x)
 
-    trainer.train()
+    results = trainer.train()
 
+    num_tokens = sum([
+        sum(
+            batch["input_ids"].view(-1).ne(tokenizer.pad_token_id)
+        )         
+        for idx, batch in enumerate(trainer.get_train_dataloader()) 
+        if idx < training_args.max_steps
+    ])
+    print(
+        f"""
+        num_tokens: {num_tokens} tokens
+        runtime: {results.metrics['train_runtime']} secs
+        throughput: {num_tokens // results.metrics['train_runtime']} toks/sec
+        """
+        )
 
 def get_parser():
     """Get the command-line argument parser."""
@@ -364,6 +377,7 @@ def get_parser():
             AimConfig,
             QuantizedLoraConfig,
             FusedOpsAndKernelsConfig,
+            InstructLabConfig,
         )
     )
     parser.add_argument(
@@ -410,6 +424,8 @@ def parse_arguments(parser, json_config=None):
             Configuration for quantized LoRA (a form of PEFT).
         FusedOpsAndKernelsConfig
             Configuration for fused operations and kernels.
+        InstructLabConfig
+            Configuration for padding free and packing.
         dict[str, str]
             Extra AIM metadata.
     """
@@ -425,6 +441,7 @@ def parse_arguments(parser, json_config=None):
             aim_config,
             quantized_lora_config,
             fusedops_kernels_config,
+            instruct_lab_config,
         ) = parser.parse_dict(json_config, allow_extra_keys=True)
         peft_method = json_config.get("peft_method")
         exp_metadata = json_config.get("exp_metadata")
@@ -440,6 +457,7 @@ def parse_arguments(parser, json_config=None):
             aim_config,
             quantized_lora_config,
             fusedops_kernels_config,
+            instruct_lab_config,
             additional,
             _,
         ) = parser.parse_args_into_dataclasses(return_remaining_strings=True)
@@ -464,6 +482,7 @@ def parse_arguments(parser, json_config=None):
         aim_config,
         quantized_lora_config,
         fusedops_kernels_config,
+        instruct_lab_config,
         exp_metadata,
     )
 
@@ -486,14 +505,16 @@ def main(**kwargs):  # pylint: disable=unused-argument
             aim_config,
             quantized_lora_config,
             fusedops_kernels_config,
+            instruct_lab_config,
             exp_metadata,
         ) = parse_arguments(parser, job_config)
+
         logger.debug(
             "Input args parsed: \
             model_args %s, data_args %s, training_args %s, trainer_controller_args %s, \
             tune_config %s, file_logger_config, %s aim_config %s, \
             quantized_lora_config %s, fusedops_kernels_config %s, \
-            exp_metadata %s",
+            instruct_lab_config %s exp_metadata %s",
             model_args,
             data_args,
             training_args,
@@ -503,6 +524,7 @@ def main(**kwargs):  # pylint: disable=unused-argument
             aim_config,
             quantized_lora_config,
             fusedops_kernels_config,
+            instruct_lab_config,
             exp_metadata,
         )
     except Exception as e:  # pylint: disable=broad-except
@@ -544,6 +566,7 @@ def main(**kwargs):  # pylint: disable=unused-argument
             exp_metadata=metadata,
             quantized_lora_config=quantized_lora_config,
             fusedops_kernels_config=fusedops_kernels_config,
+            instruct_lab_config=instruct_lab_config,           
         )
     except (MemoryError, OutOfMemoryError) as e:
         logger.error(traceback.format_exc())
