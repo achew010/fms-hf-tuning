@@ -65,6 +65,7 @@ from tuning.utils.preprocessing_utils import (
     format_dataset,
     get_data_collator,
     validate_data_args,
+    is_pretokenized_dataset,
 )
 
 

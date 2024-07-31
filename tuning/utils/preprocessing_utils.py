@@ -190,6 +190,11 @@ def get_data_collator(
             "Could not pick a data collator. Please refer to supported data formats"
         )
 
+def is_pretokenized_dataset(dataset: Dataset):
+    # Assumes is pretokenized uf `input_ids` exist in dataset columns
+    if "input_ids" in dataset.column_names:
+        return True
+    return False
 
 def format_dataset(
     data_args: configs.DataArguments, tokenizer: AutoTokenizer, max_seq_length: int
@@ -219,25 +224,34 @@ def format_dataset(
         return train_dataset, eval_dataset, None
 
     dataset_text_field = data_args.dataset_text_field
-    if data_args.pretokenized_data:
-        # assumes dataset in data_args.training_data_path is
+
+    # load 1 sample in training data to check if it is a pretokenized dataset
+    _dataset = datasets.load_dataset(
+        "json",
+        data_files=data_args.training_data_path, 
+        split="train[:1]"
+    )
+    if is_pretokenized_dataset(_dataset):
+        # assumes dataset in data_args.X_data_path is
         # - pre-formatted with some template
-        # - pre-tokenized
+        # - pre-tokenized with `input_ids` in columns
         # - response template labels have been masked
         # - appended with eos token
         train_dataset = datasets.load_dataset(
-            "json", 
+            "json",
             data_files=data_args.training_data_path, 
             split="train"
         )
-        logger.info("Pretokenized Training dataset length is %s", len(train_dataset))
+        logger.info("Pre-tokenized Training dataset length is %s", len(train_dataset))
         if data_args.validation_data_path:
             eval_dataset = datasets.load_dataset(
                 "json", 
                 data_files=data_args.validation_data_path, 
                 split="val"
             )
-            logger.info("Pretokenized validation dataset length is %s", len(eval_dataset))
+            assert is_pretokenized_dataset(eval_dataset), \
+                "Currently only support loading both pre-tokenized train dataset and validation dataset"
+            logger.info("Pre-tokenized validation dataset length is %s", len(eval_dataset))
     elif data_args.data_formatter_template or dataset_text_field:
         if dataset_text_field is None:
             dataset_text_field = "new_formatted_field"
