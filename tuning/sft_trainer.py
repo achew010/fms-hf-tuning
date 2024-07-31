@@ -65,6 +65,7 @@ from tuning.utils.preprocessing_utils import (
     format_dataset,
     get_data_collator,
     validate_data_args,
+    is_pretokenized_dataset,
 )
 
 
@@ -273,7 +274,7 @@ def train(
 
     # allow for loading pretokenized data
     dataset_kwargs = {}
-    if data_args.pretokenized_data:
+    if is_pretokenized_dataset(formatted_train_dataset):
         # flag in SFTTrainer to skip the internal formatting and tokenization
         dataset_kwargs['skip_prepare_dataset'] = True
         # Build a collator for padding, no tokenization is done inside the collator

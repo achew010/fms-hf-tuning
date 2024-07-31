@@ -79,11 +79,6 @@ class DataArguments:
                     or data_formatter_template need to be supplied."
         },
     )
-    pretokenized_data: bool = field(
-        default=False,
-        metadata={"help": "Set to true if data is already tokenized. Still requires \
-            tokenizer if there are special tokens."},
-    )
     validation_data_path: str = field(
         default=None,
         metadata={"help": "Path to the validation data in JSON/JSONL format."},
