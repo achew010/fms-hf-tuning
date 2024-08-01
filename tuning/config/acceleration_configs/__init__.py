@@ -16,3 +16,4 @@
 from .acceleration_framework_config import AccelerationFrameworkConfig
 from .fused_ops_and_kernels import FusedOpsAndKernelsConfig
 from .quantized_lora_config import QuantizedLoraConfig
+from .instruct_lab_config import InstructLabConfig
