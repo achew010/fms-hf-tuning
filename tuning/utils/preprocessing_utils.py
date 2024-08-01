@@ -190,12 +190,6 @@ def get_data_collator(
             "Could not pick a data collator. Please refer to supported data formats"
         )
 
-def is_pretokenized_dataset(dataset: Dataset):
-    # Assumes is pretokenized uf `input_ids` exist in dataset columns
-    if "input_ids" in dataset.column_names:
-        return True
-    return False
-
 def format_dataset(
     data_args: configs.DataArguments, tokenizer: AutoTokenizer, max_seq_length: int
 ):

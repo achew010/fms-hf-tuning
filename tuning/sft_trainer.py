@@ -346,22 +346,7 @@ def train(
         for x in framework.get_callbacks_and_ready_for_train(model, accelerator):
             trainer.add_callback(x)
 
-    results = trainer.train()
-
-    num_tokens = sum([
-        sum(
-            batch["input_ids"].view(-1).ne(tokenizer.pad_token_id)
-        )         
-        for idx, batch in enumerate(trainer.get_train_dataloader()) 
-        if idx < training_args.max_steps
-    ])
-    print(
-        f"""
-        num_tokens: {num_tokens} tokens
-        runtime: {results.metrics['train_runtime']} secs
-        throughput: {num_tokens // results.metrics['train_runtime']} toks/sec
-        """
-        )
+    trainer.train()
 
 def get_parser():
     """Get the command-line argument parser."""
